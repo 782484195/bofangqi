@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<link rel="stylesheet" href="/1.css">
+
+<body>
+    <div class="window" id="app">
+
+
+        <div class="nav">
+            <div class="nav-a">
+                <img src="/images/player_title.png" alt="">
+            </div>
+            <div class="nav-b" @keyup.enter="ssmsg">
+                <!-- 搜索功能 -->
+                <input type="text" class="nav-b-a" v-model="msg" @keyup.enter="ssmsg" autocomplete="off">
+                <img src="/images/zoom.png" alt="" class="nav-b-b">
+            </div>
+        </div>
+
+
+        <div class="middle">
+
+            <!-- 显示歌曲列表 -->
+            <div class="middle-a">
+                <div class="middle-a-a">
+                    <ul class="middle-a-a-a">
+                        <li class="middle-a-a-a-a" v-for="item in list">
+                            <!-- 点击开始播放 -->
+                            <a href="javascript:;" @click='kslist(item.id)'>
+                                <img src="" alt="">
+                            </a>
+                            <span class="modes">{{item.name}}</span>
+                            <span :class="['mos',{hidden:item.mvid ==0}]" @click="playMV(item.mvid)">
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+                <img src="/images/line.png" class="middle-a-b">
+            </div>
+
+            <!-- 中间唱片 -->
+            <div class="middle-b" v-if="flag">
+                <img src="/images/disc.png" :class="['middle-b-a',{
+                    autorotate:isPlay
+                }]"
+                    @click="gcbf"                
+                />
+                <img src="/images/player_bar.png" alt="" :class='["middle-b-b",{
+                    playing:isPlay}]' />
+                <img :src="coverUrl==''?'/images/cover.png':coverUrl" alt="" class="middle-b-c">
+            </div>
+            <!-- 歌词 -->
+            <div class="gc" v-else @click="qh">
+                <ul>
+                    <li v-for="item in gcmsg" class="gc-a">{{item.text}}</li>
+                </ul>
+            </div>
+
+            <!-- 热门评论 -->
+            <div class="middle-c">
+                <img src="/images/line.png" class="middle-c-a">
+                <div class="middle-c-b">
+                    <h3>热门留言</h3>
+                    <div v-for="item,index in itemList" class="middle-c-b-a">
+                        <img :src="item.user.avatarUrl" alt="" class="middle-c-b-a-a">
+                        <div class="middle-c-b-a-b">
+                            <div class="boss">{{item.user.nickname}}</div>
+                            <div class="moss">{{item.content}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="tail">
+            <!-- 音频播发 -->
+            <audio :src="listUrl" controls autoplay loop class="tail-a"></audio>
+
+        </div>
+        <div :class="['cosmv',{hidden:!isMV}]">
+            <!-- 视频播放 -->
+            <video :src="mvUrl" controls autoplay loop ref="vidio"></video>
+            <div class="x" @click="stmv">X</div>
+        </div>
+    </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    function formatLyric(text) {
+            let lyric = []
+            let arr = text.split("\n"); //原歌词文本已经换好行了方便很多，我们直接通过换行符“\n”进行切割
+            for (let i = 0; i < arr.length-1; i++) {
+                let temp_arr = arr[i].split("]"); //我们可以通过“]”对时间和文本进行分离
+                let text = temp_arr.pop(); //把歌词文本从数组中剔除出来，获取到歌词文本了！
+                let time=temp_arr[0].slice(2).split(":")
+                time = (time[0] * 60) + +time[1]
+                text && lyric.push({time,text})
+            }
+            lyric.sort((a,b)=>a.time - b.time); //由于不同时间的相同歌词我们给排到一起了，所以这里要以时间顺序重新排列一下
+            return lyric
+        }
+    let app = new Vue({
+        el: "#app",
+        data: {
+            // 搜索
+            msg: "热门",
+            // 列表
+            list: [],
+            //地址 
+            listUrl: "",
+            // 音频是否正在播放
+            isPlay: false,
+            // 视频是否在播放
+            isMV: false,
+            // MV地址
+            mvUrl: "",
+            // 封面图片的地址
+            coverUrl: "",
+            // 热门评论
+            itemList: [],
+            // 获取歌词
+            gcmsg:[],
+            // 
+            flag:true
+        },
+        methods: {
+            // 搜索歌曲
+            ssmsg() {
+                if (this.msg == 0) {
+                    return;
+                }
+                axios.get(
+                    "https://apimusic.linweiqin.com/search?keywords=" +
+                    this.msg
+                ).then((res) => {
+                    // console.log(res);
+                    this.list = res.data.result.songs
+                })
+                this.msg = ""
+            },
+            // 开始播放
+            kslist(id) {
+                // 获取歌曲url
+                this.isPlay = true
+                axios.get("https://apimusic.linweiqin.com/song/url?id=" +
+                    id).then((res) => {
+                        // console.log(res);
+                        
+                    this.listUrl = res.data.data[0].url
+                });
+                // 获取歌曲背景图
+                axios.get("https://apimusic.linweiqin.com/song/detail?ids=" +
+                    id).then((res) => {
+                    // console.log(res);
+
+                    this.coverUrl = res.data.songs[0].al.picUrl
+                });
+                // 获取热门评论
+                axios.get("https://apimusic.linweiqin.com/comment/hot?type=0", {
+                    params: {
+                        id: id
+                    }
+                }).then((res) => {
+                    this.itemList = res.data.hotComments
+                    // console.log(res);
+                });
+                // 获取歌词
+                axios.get("http://api.imjad.cn/cloudmusic/?type=lyric",{
+                    params:{id:id}
+                } 
+                ).then((res)=>{
+                    console.log(res);
+                    this.gcmsg = formatLyric(res.data.lrc.lyric)
+                    console.log(this.gcmsg);
+                })
+
+                
+            },
+            playMV(id) {
+                // 获取视频地址
+                this.isMV = true;
+                axios.get("https://apimusic.linweiqin.com/mv/url?id=" +
+                    id).then((res) => {
+                    // console.log(res);
+                    this.mvUrl = res.data.data.url
+                })
+            },
+            // 停止播放MV
+            stmv() {
+                this.isMV = false;
+                this.$refs.vidio.pause();
+            },
+            // 歌词播放
+            gcbf(){
+                this.flag = false
+            },
+            qh(){
+                this.flag = true
+            }
+
+        },
+        computed: {
+
+        },
+        mounted() {
+            axios.get('https://apimusic.linweiqin.com/search', {
+                    params: {
+                        keywords: this.msg
+                    }
+                })
+                .then((res) => {
+                    // console.log(res);
+                    this.list = res.data.result.songs;
+                    let id = this.list.id
+                    axios.get("https://apimusic.linweiqin.com/song/url", {
+                        params: {id:id}
+                    }).then((res) => {
+                        // console.log(res);
+
+                    })
+                });
+        }
+    })
+</script>
+
+</html>
